@@ -478,10 +478,6 @@ public class TlsChannelImpl implements ByteChannel {
 
                 if (!handshakeStarted) {
                     engine.beginHandshake();
-
-                    // Some engines that do not support renegotiations may be sensitive to calling
-                    // SSLEngine.beginHandshake() more than once. This guard prevents that.
-                    // See: https://github.com/marianobarrios/tls-channel/issues/197
                     handshakeStarted = true;
                 }
 
