@@ -99,7 +99,9 @@ public class TlsChannelImpl implements ByteChannel {
     private final Lock readLock = new ReentrantLock();
     private final Lock writeLock = new ReentrantLock();
 
-    private volatile boolean negotiated = false;
+    private boolean handshakeStarted = false;
+
+    private volatile boolean handshakeCompleted = false;
 
     /**
      * Whether a IOException was received from the underlying channel or from the {@link SSLEngine}.
@@ -464,7 +466,7 @@ public class TlsChannelImpl implements ByteChannel {
     }
 
     private void doHandshake(boolean force) throws IOException, EofException {
-        if (!force && negotiated) {
+        if (!force && handshakeCompleted) {
             return;
         }
         initLock.lock();
@@ -472,13 +474,20 @@ public class TlsChannelImpl implements ByteChannel {
             if (invalid || shutdownSent) {
                 throw new ClosedChannelException();
             }
-            if (force || !negotiated) {
-                engine.beginHandshake();
+            if (force || !handshakeCompleted) {
+
+                if (!handshakeStarted) {
+                    engine.beginHandshake();
+                    handshakeStarted = true;
+                }
+
                 writeAndHandshake();
 
                 if (engine.getSession().getProtocol().startsWith("DTLS")) {
                     throw new IllegalArgumentException("DTLS not supported");
                 }
+
+                handshakeCompleted = true;
 
                 // call client code
                 try {
@@ -486,7 +495,6 @@ public class TlsChannelImpl implements ByteChannel {
                 } catch (Exception e) {
                     throw new TlsChannelCallbackException("session initialization callback failed", e);
                 }
-                negotiated = true;
             }
         } finally {
             initLock.unlock();
